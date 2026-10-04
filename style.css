@@ -1,0 +1,1396 @@
+:root {
+  --bg: #1b1c24;
+  --text: #ece6d6;
+  --muted: #b3b1a8;
+  --dim: #8f93a3;
+
+  --gold: #e6bf63;
+  --gold-hi: #f4d98d;
+  --gold-soft: rgba(230, 191, 99, 0.16);
+  --gold-line: rgba(230, 191, 99, 0.55);
+
+  --wood: #74492a;
+  --wood-dark: #4c301b;
+  --wood-light: #93643a;
+  --purple: #7a3a9f;
+  --purple-deep: #4a2072;
+  --purple-trim: #c98ff0;
+  --brew: #eba51a;
+  --brew-hi: #f7bd3d;
+  --brew-edge: #8e5a06;
+  --info: #276f9c;
+  --info-hi: #318ac0;
+  --danger: #e8786e;
+  --ok: #7fcf9f;
+
+  --parch: #f3e3b2;
+  --parch-row: #faf0cf;
+  --parch-line: #d2bb80;
+  --ink: #3f301a;
+  --ink-muted: #6a5833;
+
+  --r-panel: 12px;
+  --r-ctl: 8px;
+  --r-tag: 6px;
+
+  --font-display: "Outfit", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Geist", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* what the controls inside a surface use; parchment and the dark surfaces set their own */
+  --btn-bg: rgba(22, 13, 6, 0.5);
+  --btn-bg-hover: rgba(22, 13, 6, 0.72);
+  --btn-line: rgba(0, 0, 0, 0.55);
+  --btn-text: #f4ecd4;
+  --row: rgba(0, 0, 0, 0.22);
+  --row-line: rgba(0, 0, 0, 0.35);
+  --tag: rgba(0, 0, 0, 0.3);
+  --field: #1a120a;
+  --card-text: #f6eed6;
+  --card-muted: #e0d3b1;
+  --card-dim: #d2c39e;
+  --card-accent: var(--gold-hi);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* our own display rules would otherwise beat the browser's [hidden] */
+[hidden] {
+  display: none !important;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+/* the cobblestone wall, on its own fixed layer: a fixed body background repaints on every scroll */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 20%, transparent 40%, rgba(0, 0, 0, 0.55) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cg stroke='%2314151b' stroke-width='3'%3E%3Crect x='2' y='2' width='66' height='46' rx='16' fill='%23262731'/%3E%3Crect x='72' y='2' width='56' height='46' rx='16' fill='%23292a36'/%3E%3Crect x='132' y='2' width='66' height='46' rx='16' fill='%23232430'/%3E%3Crect x='2' y='52' width='96' height='46' rx='16' fill='%23292a35'/%3E%3Crect x='102' y='52' width='56' height='46' rx='16' fill='%23242530'/%3E%3Crect x='162' y='52' width='36' height='46' rx='16' fill='%23282934'/%3E%3Crect x='2' y='102' width='51' height='46' rx='16' fill='%23232430'/%3E%3Crect x='57' y='102' width='71' height='46' rx='16' fill='%23282935'/%3E%3Crect x='132' y='102' width='66' height='46' rx='16' fill='%23252631'/%3E%3Crect x='2' y='152' width='81' height='46' rx='16' fill='%23292a36'/%3E%3Crect x='87' y='152' width='61' height='46' rx='16' fill='%23232430'/%3E%3Crect x='152' y='152' width='46' height='46' rx='16' fill='%23272833'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* grain, as on Eggsplorer */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.topbar,
+.page,
+.site-footer {
+  position: relative;
+  z-index: 1;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: var(--r-ctl);
+  background: var(--gold);
+  color: #1a1305;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.2s var(--ease);
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold-hi);
+  outline-offset: 2px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+/* ---------- Top bar: same bar as Eggsplorer Depths ---------- */
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 20px 28px 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* the round purple badge of the in-game window, with its flask */
+.brand-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #a455cf, var(--purple-deep) 75%);
+  box-shadow:
+    inset 0 0 0 2px rgba(230, 191, 99, 0.75),
+    0 6px 18px -4px rgba(122, 58, 159, 0.7);
+}
+
+.brand-mark svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: var(--gold-hi);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.topbar h1,
+.topbar p {
+  margin: 0;
+}
+
+.topbar h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.topbar p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.topbar-link {
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  transition: color 0.18s ease, border-color 0.18s ease;
+}
+
+.topbar-link:hover {
+  color: var(--gold-hi);
+  border-color: var(--gold-line);
+}
+
+/* ---------- Page ---------- */
+
+.page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 0 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.col-input,
+.col-result {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.col-result {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100dvh - 32px);
+}
+
+.col-result > #result {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.col-result .result-card {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+@media (max-width: 1040px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .col-result {
+    position: static;
+    max-height: none;
+  }
+}
+
+/* ---------- Footer: same as Eggsplorer Depths ---------- */
+
+.site-footer {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 22px 28px 34px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.site-footer p {
+  max-width: 78ch;
+  margin: 0;
+}
+
+.site-footer p + p {
+  margin-top: 8px;
+}
+
+.site-footer .credits {
+  color: var(--muted);
+}
+
+.site-footer a {
+  color: var(--gold-hi);
+  text-underline-offset: 3px;
+}
+
+/* ---------- Surfaces ---------- */
+
+.card {
+  position: relative;
+  min-width: 0;
+  padding: 20px;
+  border-radius: var(--r-panel);
+  color: var(--card-text);
+  --text: var(--card-text);
+  --muted: var(--card-muted);
+  --dim: var(--card-dim);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.card-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.card-sub {
+  margin: 4px 0 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 13px;
+  text-wrap: pretty;
+}
+
+.step-num {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-tag);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--gold-hi);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* the wooden shelf of the game: frame, plank back, a board under every row of jars */
+.card-wood {
+  border: 4px solid var(--wood-dark);
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.09) 0 2px, transparent 2px 11px, rgba(255, 255, 255, 0.04) 11px 12px, transparent 12px 29px),
+    linear-gradient(180deg, var(--wood-light), var(--wood) 55%, #6a4125);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.16),
+    0 16px 30px -18px rgba(0, 0, 0, 0.85);
+}
+
+.card-wood .card-title {
+  padding: 6px 14px 6px 8px;
+  border-radius: var(--r-ctl);
+  background: rgba(46, 28, 14, 0.82);
+  color: var(--gold-hi);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+/* the purple tablecloth where the two runes sit */
+.card-cloth {
+  overflow: hidden;
+  border: 1px solid #2a1042;
+  background: linear-gradient(180deg, #8442ab, var(--purple) 12%, #5f2c88 60%, #4a2072);
+  box-shadow:
+    inset 0 0 0 3px rgba(201, 143, 240, 0.8),
+    inset 0 0 0 6px #52247c,
+    0 16px 30px -18px rgba(0, 0, 0, 0.85);
+  --card-accent: var(--gold-hi);
+}
+
+.card-cloth::after {
+  content: "";
+  position: absolute;
+  top: -46px;
+  right: -46px;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, transparent 0 14px, rgba(230, 191, 99, 0.3) 14px 15px, transparent 15px 22px);
+  pointer-events: none;
+}
+
+.card-cloth > * {
+  position: relative;
+  z-index: 1;
+}
+
+.card-cloth .card-title {
+  color: #fff;
+}
+
+/* the parchment pages: recipe book, result */
+.card-parchment {
+  --text: var(--ink);
+  --muted: var(--ink-muted);
+  --dim: var(--ink-muted);
+  --card-text: var(--ink);
+  --card-muted: var(--ink-muted);
+  --card-dim: var(--ink-muted);
+  --btn-bg: #e8d59d;
+  --btn-bg-hover: #f1e2b4;
+  --btn-line: #b99d5f;
+  --btn-text: var(--ink);
+  --row: var(--parch-row);
+  --row-line: var(--parch-line);
+  --tag: #e8d6a0;
+  --field: #fcf5dc;
+  color-scheme: light;
+  border: 3px solid #cdb472;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.04 .5' numOctaves='3' seed='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='.1'/%3E%3C/svg%3E"),
+    linear-gradient(180deg, #f7e9bd, var(--parch));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 16px 30px -18px rgba(0, 0, 0, 0.85);
+}
+
+.card-parchment .step-num {
+  background: rgba(74, 32, 114, 0.12);
+  color: var(--purple-deep);
+}
+
+/* ---------- Buttons ---------- */
+
+.btn {
+  min-height: 34px;
+  border: 1px solid var(--btn-line);
+  background: var(--btn-bg);
+  border-radius: var(--r-ctl);
+  padding: 6px 12px;
+  color: var(--btn-text);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.12s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+  border-color: var(--gold-line);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+}
+
+.btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.btn-danger:hover:not(:disabled) {
+  border-color: rgba(232, 120, 110, 0.7);
+  background: rgba(232, 120, 110, 0.18);
+}
+
+.btn-sm {
+  min-height: 30px;
+  padding: 4px 10px;
+}
+
+/* the blue "Okay" button of the game */
+.btn-info {
+  border-color: #1d587d;
+  background: var(--info);
+  color: #fff;
+  font-weight: 650;
+}
+
+.btn-info:hover:not(:disabled) {
+  background: var(--info-hi);
+  border-color: #1d587d;
+}
+
+/* the chunky orange "Brew!" button */
+.btn-primary {
+  border: 2px solid var(--brew-edge);
+  background: linear-gradient(180deg, var(--brew-hi), var(--brew));
+  color: #3a2402;
+  font-weight: 700;
+  box-shadow: 0 4px 0 var(--brew-edge), 0 14px 22px -10px rgba(235, 165, 26, 0.55);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffd062, var(--brew-hi));
+  border-color: var(--brew-edge);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--brew-edge);
+}
+
+.optimize-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.btn-optimize {
+  min-height: 54px;
+  padding: 10px 44px;
+  border-radius: var(--r-ctl);
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: -0.005em;
+}
+
+.btn-optimize:disabled {
+  opacity: 0.75;
+  box-shadow: 0 4px 0 var(--brew-edge);
+}
+
+.optimize-hint {
+  color: var(--muted);
+}
+
+.optimize-hint strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- Inventory: jars on the shelf ---------- */
+
+.inventory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px 8px;
+  padding: 16px 12px 24px;
+  border-radius: var(--r-ctl);
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.2) 0 2px, transparent 2px 76px),
+    linear-gradient(180deg, #4f321c, #5f3d23);
+  box-shadow: inset 0 5px 16px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 640px) {
+  .inventory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.ingredient {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 6px 4px;
+  border-radius: var(--r-ctl);
+  transition: box-shadow 0.18s ease;
+}
+
+/* the board under the jars */
+.ingredient::after {
+  content: "";
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  bottom: -9px;
+  height: 8px;
+  z-index: 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #a2703f, #74492a);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.5);
+}
+
+.ingredient > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ingredient:focus-within {
+  box-shadow: 0 0 0 2px var(--gold-line);
+}
+
+.ingredient-head {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  grid-template-areas: "jar name" "jar tier";
+  align-items: center;
+  column-gap: 8px;
+}
+
+.jar {
+  grid-area: jar;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.42);
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.1) 38%, transparent 62%),
+    rgba(170, 205, 225, 0.2);
+  box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.35);
+  font-size: 24px;
+  line-height: 1;
+  transition: opacity 0.18s ease, filter 0.18s ease;
+}
+
+.ingredient:not(.has-stock) .jar {
+  opacity: 0.5;
+  filter: saturate(0.35);
+}
+
+.ingredient-name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--card-text);
+}
+
+.ingredient:not(.has-stock) .ingredient-name {
+  color: var(--card-muted);
+}
+
+/* the deeper the craft, the more gold in the tag */
+.tier {
+  grid-area: tier;
+  justify-self: start;
+  padding: 0 6px;
+  border-radius: var(--r-tag);
+  background: color-mix(in srgb, var(--gold) calc(var(--tier, 0) * 11%), rgba(0, 0, 0, 0.35));
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tier-0 { --tier: 0; color: var(--card-muted); }
+.tier-1 { --tier: 1; }
+.tier-2 { --tier: 2; }
+.tier-3 { --tier: 3; }
+.tier-4 { --tier: 4; }
+.tier-5 { --tier: 5; }
+.tier-6 { --tier: 6; }
+
+.stepper {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 30px;
+  gap: 4px;
+}
+
+.step-btn {
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--btn-line);
+  background: var(--btn-bg);
+  border-radius: var(--r-ctl);
+  color: var(--btn-text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.12s ease;
+}
+
+.step-btn:hover:not(:disabled) {
+  background: var(--btn-bg-hover);
+  border-color: var(--gold-line);
+}
+
+.step-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.step-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* the black count badge of the game, here a field you can type in */
+.count-input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  text-align: center;
+  background: #120d08;
+  border: 1px solid #000;
+  border-radius: var(--r-ctl);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.count-input:focus {
+  border-color: var(--gold);
+  outline: none;
+}
+
+.ingredient:not(.has-stock) .count-input {
+  color: #8a8372;
+}
+
+/* ---------- Target: on the tablecloth ---------- */
+
+.target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 6px;
+}
+
+.target-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 11px;
+  border-radius: var(--r-ctl);
+  border: 1px solid rgba(201, 143, 240, 0.4);
+  background: rgba(34, 10, 58, 0.45);
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.12s ease;
+}
+
+.target-chip:hover {
+  border-color: rgba(230, 191, 99, 0.7);
+  background: rgba(34, 10, 58, 0.65);
+}
+
+.target-chip:active {
+  transform: scale(0.985);
+}
+
+.target-chip.selected {
+  border-color: var(--gold);
+  background: rgba(230, 191, 99, 0.22);
+  box-shadow: 0 0 0 1px var(--gold), 0 0 18px -4px rgba(230, 191, 99, 0.6);
+}
+
+.target-name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.target-best {
+  color: #e6d8f4;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.target-chip.selected .target-best {
+  color: var(--gold-hi);
+}
+
+/* ---------- Result: a page of the book ---------- */
+
+.result-empty p {
+  margin: 0;
+  max-width: 58ch;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.result-running {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.result-running p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.result-running .btn {
+  align-self: flex-start;
+}
+
+/* skeleton in the shape of the result it stands for */
+.skeleton {
+  border-radius: var(--r-ctl);
+  background: linear-gradient(100deg, #eadba7 30%, #f6ebc6 50%, #eadba7 70%) 0 0 / 220% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.skeleton-title {
+  height: 46px;
+  width: 58%;
+}
+
+.skeleton-row {
+  height: 36px;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.result-error {
+  border-color: #c4685d;
+}
+
+.notice {
+  padding: 9px 13px;
+  border: 1px solid rgba(230, 166, 95, 0.55);
+  border-radius: var(--r-ctl);
+  background: rgba(230, 166, 95, 0.14);
+  color: #8a4b00;
+  font-size: 13px;
+}
+
+.result-card > .notice {
+  margin-bottom: 16px;
+}
+
+.notice-error {
+  border-color: rgba(232, 120, 110, 0.6);
+  background: rgba(232, 120, 110, 0.12);
+  color: #ffb8b0;
+}
+
+.notice ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.big-value {
+  color: #7a4700;
+  font-family: var(--font-display);
+  font-size: clamp(38px, 4vw, 50px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.big-unit {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+}
+
+.badge {
+  padding: 3px 10px;
+  border-radius: var(--r-tag);
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.badge-ok {
+  color: #1f5e34;
+  border-color: rgba(31, 94, 52, 0.45);
+  background: rgba(63, 160, 98, 0.18);
+}
+
+.badge-warn {
+  color: #8a4b00;
+  border-color: rgba(138, 75, 0, 0.45);
+  background: rgba(230, 166, 95, 0.25);
+}
+
+.warn-text {
+  color: #8a4b00;
+  font-size: 13px;
+}
+
+.section-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+
+.section-row .section-title {
+  margin: 0;
+}
+
+.section-title {
+  margin: 24px 0 10px;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.toggle input {
+  accent-color: var(--purple);
+}
+
+.plan {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* the plan lands step by step, in the order you will craft it */
+.plan.enter > li {
+  animation: step-in 0.4s var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 28ms);
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.plan-phase {
+  padding: 10px 2px 2px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* rows like the recipe rows of the game book */
+.plan-step {
+  display: grid;
+  grid-template-columns: 24px 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--row);
+  border: 1px solid var(--row-line);
+  border-radius: var(--r-ctl);
+  box-shadow: inset 0 -2px 0 rgba(120, 90, 30, 0.12);
+}
+
+.plan-index {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: right;
+}
+
+.plan-times {
+  color: var(--purple-deep);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.plan-recipe {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.op {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: var(--r-tag);
+  background: var(--tag);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.pill-made {
+  background: #e5d3f2;
+  color: var(--purple-deep);
+}
+
+.pill-reward {
+  background: #f6d675;
+  color: #4d3000;
+  font-weight: 650;
+}
+
+.plan-gain {
+  color: #7a4700;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.plan-inv {
+  grid-column: 3 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.inv-chip {
+  padding: 1px 7px;
+  border-radius: var(--r-tag);
+  background: var(--tag);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.inv-chip.down {
+  color: #8c2f25;
+}
+
+.inv-chip.up {
+  color: #1f5e34;
+}
+
+.totals {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--r-ctl);
+  background: #f4d27a;
+  border: 1px solid #c79a2e;
+}
+
+.total-main {
+  color: #4d3000;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.totals .muted {
+  color: #6a4a10;
+}
+
+.remaining-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 4px;
+}
+
+.remaining {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--r-ctl);
+  background: var(--row);
+  border: 1px solid var(--row-line);
+  font-size: 13px;
+}
+
+.remaining.zero {
+  opacity: 0.5;
+}
+
+.remaining-name {
+  color: var(--muted);
+}
+
+.remaining-count {
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.remaining .was {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.stats {
+  margin-top: 24px;
+  border-top: 1px solid var(--parch-line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.stats summary {
+  cursor: pointer;
+}
+
+.stats dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  margin: 12px 0 0;
+}
+
+.stats dt {
+  color: var(--muted);
+}
+
+.stats dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+/* ---------- Recipe book ---------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.field {
+  height: 36px;
+  background: var(--field);
+  border: 1px solid var(--parch-line);
+  border-radius: var(--r-ctl);
+  padding: 0 11px;
+  min-width: 0;
+  color: var(--ink);
+  transition: border-color 0.18s ease;
+}
+
+.field:hover {
+  border-color: #a98b4a;
+}
+
+.field:focus {
+  border-color: var(--purple);
+  outline: none;
+}
+
+.field-search {
+  flex: 1 1 220px;
+}
+
+select.field {
+  flex: 0 1 190px;
+}
+
+/* the blue ribbon tabs of the book */
+.segmented {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--r-ctl);
+  background: #e3cf95;
+}
+
+.segmented button {
+  height: 30px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: var(--r-tag);
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+.segmented button:hover {
+  color: var(--ink);
+}
+
+.segmented button.active {
+  background: var(--info);
+  color: #fff;
+}
+
+.table-wrap {
+  max-height: 560px;
+  overflow: auto;
+  border: 1px solid var(--parch-line);
+  border-radius: var(--r-ctl);
+  background: var(--parch-row);
+}
+
+table.recipes {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.recipes th {
+  position: sticky;
+  top: 0;
+  background: #e8d59d;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-muted);
+  font-size: 13px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--parch-line);
+}
+
+.recipes td {
+  padding: 7px 14px;
+  border-bottom: 1px solid #e4d3a0;
+  white-space: nowrap;
+}
+
+.recipes td .icon {
+  margin-right: 7px;
+  font-size: 17px;
+  vertical-align: -2px;
+}
+
+.recipes tbody tr:hover {
+  background: #fff6d6;
+}
+
+.recipes tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.recipes .num {
+  width: 48px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.reward-cell {
+  color: #7a4700;
+  font-weight: 650;
+}
+
+.made-cell {
+  color: var(--purple-deep);
+  font-weight: 550;
+}
+
+.kind {
+  padding: 1px 8px;
+  border-radius: var(--r-tag);
+  border: 1px solid var(--parch-line);
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.kind-reward {
+  color: #7a4700;
+  border-color: #c79a2e;
+  background: rgba(246, 214, 117, 0.45);
+}
+
+.kind-ingredient {
+  color: var(--purple-deep);
+  border-color: #b890d6;
+  background: rgba(229, 211, 242, 0.7);
+}
+
+.empty-row {
+  text-align: center;
+  padding: 28px;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+  .topbar,
+  .site-footer {
+    padding-inline: 16px;
+  }
+
+  .page {
+    padding: 0 16px 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 15px;
+  }
+
+  .topbar h1 {
+    font-size: 21px;
+  }
+
+  .topbar-link {
+    display: none;
+  }
+
+  .btn-optimize {
+    flex: 1;
+  }
+
+  .ingredient-name {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
+  }
+
+  .plan-step {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+  }
+
+  .plan-index {
+    display: none;
+  }
+
+  .plan-inv {
+    grid-column: 1 / -1;
+  }
+
+  select.field {
+    flex: 1 1 140px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

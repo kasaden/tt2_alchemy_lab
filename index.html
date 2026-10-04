@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Find the best crafting path for your Tap Titans 2 Alchemy Lab inventory." />
+  <meta name="theme-color" content="#1b1c24" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <title>TT2 Alchemy Optimizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@500;600&family=Outfit:wght@500;600;700&display=swap" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to the optimizer</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32">
+          <path d="M12 6h8M14 6v7l-6 10a3 3 0 0 0 2.6 4.5h10.8A3 3 0 0 0 24 23l-6-10V6" />
+          <path d="M10.5 20h11" />
+        </svg>
+      </span>
+      <div>
+        <h1>TT2 Alchemy Optimizer</h1>
+        <p>Best crafting path for the Alchemy Lab event of Tap Titans 2</p>
+      </div>
+    </div>
+    <a class="topbar-link" href="tt2_alchemy_v8_2_recipes.csv">Recipes (CSV)</a>
+  </header>
+
+  <main id="content" class="page" tabindex="-1">
+    <div id="dataNotice" class="notice notice-error" role="alert" hidden></div>
+
+    <div class="layout">
+      <div class="col-input">
+        <section class="card card-wood" aria-labelledby="inventory-title">
+          <header class="card-header">
+            <div>
+              <h2 id="inventory-title" class="card-title"><span class="step-num">1</span> Inventory</h2>
+              <p id="inventorySub" class="card-sub"></p>
+            </div>
+            <div class="toolbar">
+              <button id="loadExampleBtn" type="button" class="btn">Load example</button>
+              <button id="addAllBtn" type="button" class="btn">+1 to all</button>
+              <button id="clearBtn" type="button" class="btn">Clear inventory</button>
+              <button id="resetAllBtn" type="button" class="btn btn-danger">Reset all</button>
+            </div>
+          </header>
+          <div id="inventoryGrid" class="inventory-grid"></div>
+        </section>
+
+        <section class="card card-cloth" aria-labelledby="target-title">
+          <header class="card-header">
+            <div>
+              <h2 id="target-title" class="card-title"><span class="step-num">2</span> Target reward</h2>
+              <p class="card-sub">The resource to maximise. The number is the best single recipe, not the optimum.</p>
+            </div>
+          </header>
+          <div id="targetGrid" class="target-grid" role="radiogroup" aria-labelledby="target-title"></div>
+        </section>
+      </div>
+
+      <div class="col-result">
+        <div class="optimize-bar">
+          <button id="optimizeBtn" type="button" class="btn btn-primary btn-optimize">Optimize</button>
+          <span class="optimize-hint">Maximise <strong id="targetLabel"></strong></span>
+        </div>
+        <div id="result"></div>
+      </div>
+    </div>
+
+    <section class="card card-parchment" aria-labelledby="recipes-title">
+      <header class="card-header">
+        <div>
+          <h2 id="recipes-title" class="card-title">Recipe Book</h2>
+          <p id="recipesSub" class="card-sub"></p>
+        </div>
+      </header>
+
+      <div class="filters">
+        <input id="searchInput" type="search" class="field field-search" placeholder="Search, e.g. Crafting Shards" aria-label="Search recipes" />
+        <select id="ing1Select" class="field" aria-label="Ingredient 1"></select>
+        <select id="ing2Select" class="field" aria-label="Ingredient 2"></select>
+        <select id="resultSelect" class="field" aria-label="Result"></select>
+        <div id="kindFilter" class="segmented" role="radiogroup" aria-label="Result kind"></div>
+        <button id="clearFiltersBtn" type="button" class="btn btn-sm" hidden>Clear filters</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="recipes">
+          <thead>
+            <tr>
+              <th class="num">#</th>
+              <th>Ingredient 1</th>
+              <th>Ingredient 2</th>
+              <th>Result</th>
+              <th>Kind</th>
+            </tr>
+          </thead>
+          <tbody id="recipeBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p class="credits">
+      The recipes on this site are read from <code>tt2_alchemy_v8_2_recipes.csv</code> and
+      <code>tt2_alchemy_v8_2_ingredients.csv</code>. Your inventory is stored only in this browser.
+    </p>
+    <p>
+      UNOFFICIAL. Tap Titans 2 is a trademark of Game Hive Corp.
+      This site is not affiliated with or endorsed by Game Hive.
+    </p>
+  </footer>
+
+  <script type="module" src="index.js"></script>
+</body>
+</html>
