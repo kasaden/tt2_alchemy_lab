@@ -1,0 +1,137 @@
+﻿recipe_id,ingredient_1,ingredient_2,result,result_kind,result_quantity,result_name
+1,Pepper,Pepper,12 Currency,reward,12,Currency
+2,Pepper,Berries,Sand,ingredient,1,Sand
+3,Pepper,Mushroom,Petal,ingredient,1,Petal
+4,Pepper,Sand,18 Common Equipment,reward,18,Common Equipment
+5,Pepper,Petal,1 Event Equipment,reward,1,Event Equipment
+6,Pepper,Acorn,18 Currency,reward,18,Currency
+7,Pepper,Feather,10 Raid Cards,reward,10,Raid Cards
+8,Pepper,Shadow,5 Eggs,reward,5,Eggs
+9,Pepper,Spirit,32 Common Equipment,reward,32,Common Equipment
+10,Pepper,Essence,60 Currency,reward,60,Currency
+11,Pepper,Power,60 Currency,reward,60,Currency
+12,Pepper,Beetle,2 Skill Points,reward,2,Skill Points
+13,Pepper,Tooth,7 Hero Weapons,reward,7,Hero Weapons
+14,Pepper,Flame,116 Currency,reward,116,Currency
+15,Pepper,Steel,1 Clan Scroll,reward,1,Clan Scroll
+16,Pepper,Scale,232 Currency,reward,232,Currency
+17,Berries,Berries,12 Currency,reward,12,Currency
+18,Berries,Mushroom,Acorn,ingredient,1,Acorn
+19,Berries,Sand,10 Perk Tickets,reward,10,Perk Tickets
+20,Berries,Petal,1 Event Equipment,reward,1,Event Equipment
+21,Berries,Acorn,6 Raid Cards,reward,6,Raid Cards
+22,Berries,Feather,32 Currency,reward,32,Currency
+23,Berries,Shadow,10 Perk Tickets,reward,10,Perk Tickets
+24,Berries,Spirit,4 Crafting Shards,reward,4,Crafting Shards
+25,Berries,Essence,20 Raid Cards,reward,20,Raid Cards
+26,Berries,Power,20 Perk Tickets,reward,20,Perk Tickets
+27,Berries,Beetle,60 Currency,reward,60,Currency
+28,Berries,Tooth,116 Currency,reward,116,Currency
+29,Berries,Flame,116 Currency,reward,116,Currency
+30,Berries,Steel,1 Clan Scroll,reward,1,Clan Scroll
+31,Berries,Scale,232 Currency,reward,232,Currency
+32,Mushroom,Mushroom,12 Currency,reward,12,Currency
+33,Mushroom,Sand,1 Rare Equipment,reward,1,Rare Equipment
+34,Mushroom,Petal,1 Event Equipment,reward,1,Event Equipment
+35,Mushroom,Acorn,6 Raid Cards,reward,6,Raid Cards
+36,Mushroom,Feather,10 Raid Cards,reward,10,Raid Cards
+37,Mushroom,Shadow,5 Eggs,reward,5,Eggs
+38,Mushroom,Spirit,4 Crafting Shards,reward,4,Crafting Shards
+39,Mushroom,Essence,60 Currency,reward,60,Currency
+40,Mushroom,Power,60 Currency,reward,60,Currency
+41,Mushroom,Beetle,2 Skill Points,reward,2,Skill Points
+42,Mushroom,Tooth,116 Currency,reward,116,Currency
+43,Mushroom,Flame,116 Currency,reward,116,Currency
+44,Mushroom,Steel,116 Currency,reward,116,Currency
+45,Mushroom,Scale,232 Currency,reward,232,Currency
+46,Sand,Sand,2 Rare Equipment,reward,2,Rare Equipment
+47,Sand,Petal,Spirit,ingredient,1,Spirit
+48,Sand,Acorn,Feather,ingredient,1,Feather
+49,Sand,Feather,12 Raid Cards,reward,12,Raid Cards
+50,Sand,Shadow,38 Currency,reward,38,Currency
+51,Sand,Spirit,5 Crafting Shards,reward,5,Crafting Shards
+52,Sand,Essence,6 Rare Equipment,reward,6,Rare Equipment
+53,Sand,Power,66 Currency,reward,66,Currency
+54,Sand,Beetle,66 Currency,reward,66,Currency
+55,Sand,Tooth,122 Currency,reward,122,Currency
+56,Sand,Flame,30 Wildcards,reward,30,Wildcards
+57,Sand,Steel,1 Clan Scroll,reward,1,Clan Scroll
+58,Sand,Scale,23 Rare Equipment,reward,23,Rare Equipment
+59,Petal,Petal,1 Event Equipment,reward,1,Event Equipment
+60,Petal,Acorn,Shadow,ingredient,1,Shadow
+61,Petal,Feather,1 Event Equipment,reward,1,Event Equipment
+62,Petal,Shadow,38 Currency,reward,38,Currency
+63,Petal,Spirit,38 Currency,reward,38,Currency
+64,Petal,Essence,22 Raid Cards,reward,22,Raid Cards
+65,Petal,Power,66 Currency,reward,66,Currency
+66,Petal,Beetle,2 Skill Points,reward,2,Skill Points
+67,Petal,Tooth,8 Hero Weapons,reward,8,Hero Weapons
+68,Petal,Flame,122 Currency,reward,122,Currency
+69,Petal,Steel,122 Currency,reward,122,Currency
+70,Petal,Scale,238 Currency,reward,238,Currency
+71,Acorn,Acorn,25 Currency,reward,25,Currency
+72,Acorn,Feather,38 Currency,reward,38,Currency
+73,Acorn,Shadow,6 Eggs,reward,6,Eggs
+74,Acorn,Spirit,12 Raid Cards,reward,12,Raid Cards
+75,Acorn,Essence,22 Raid Cards,reward,22,Raid Cards
+76,Acorn,Power,66 Currency,reward,66,Currency
+77,Acorn,Beetle,66 Currency,reward,66,Currency
+78,Acorn,Tooth,40 Raid Cards,reward,40,Raid Cards
+79,Acorn,Flame,122 Currency,reward,122,Currency
+80,Acorn,Steel,40 Raid Cards,reward,40,Raid Cards
+81,Acorn,Scale,79 Raid Cards,reward,79,Raid Cards
+82,Feather,Feather,52 Currency,reward,52,Currency
+83,Feather,Shadow,Power,ingredient,1,Power
+84,Feather,Spirit,Beetle,ingredient,1,Beetle
+85,Feather,Essence,80 Currency,reward,80,Currency
+86,Feather,Power,1 Legendary Equipment,reward,1,Legendary Equipment
+87,Feather,Beetle,26 Raid Cards,reward,26,Raid Cards
+88,Feather,Tooth,45 Raid Cards,reward,45,Raid Cards
+89,Feather,Flame,136 Currency,reward,136,Currency
+90,Feather,Steel,45 Raid Cards,reward,45,Raid Cards
+91,Feather,Scale,84 Raid Cards,reward,84,Raid Cards
+92,Shadow,Shadow,52 Currency,reward,52,Currency
+93,Shadow,Spirit,Essence,ingredient,1,Essence
+94,Shadow,Essence,13 Eggs,reward,13,Eggs
+95,Shadow,Power,1 Legendary Equipment,reward,1,Legendary Equipment
+96,Shadow,Beetle,80 Currency,reward,80,Currency
+97,Shadow,Tooth,6 Fortune Weapons,reward,6,Fortune Weapons
+98,Shadow,Flame,34 Wildcards,reward,34,Wildcards
+99,Shadow,Steel,1 Fortune Scroll,reward,1,Fortune Scroll
+100,Shadow,Scale,42 Eggs,reward,42,Eggs
+101,Spirit,Spirit,52 Currency,reward,52,Currency
+102,Spirit,Essence,26 Raid Cards,reward,26,Raid Cards
+103,Spirit,Power,1 Legendary Equipment,reward,1,Legendary Equipment
+104,Spirit,Beetle,3 Skill Points,reward,3,Skill Points
+105,Spirit,Tooth,19 Crafting Shards,reward,19,Crafting Shards
+106,Spirit,Flame,136 Currency,reward,136,Currency
+107,Spirit,Steel,19 Crafting Shards,reward,19,Crafting Shards
+108,Spirit,Scale,36 Crafting Shards,reward,36,Crafting Shards
+109,Essence,Essence,108 Currency,reward,108,Currency
+110,Essence,Power,Steel,ingredient,1,Steel
+111,Essence,Beetle,Flame,ingredient,1,Flame
+112,Essence,Tooth,54 Raid Cards,reward,54,Raid Cards
+113,Essence,Flame,108 Currency,reward,108,Currency
+114,Essence,Steel,54 Raid Cards,reward,54,Raid Cards
+115,Essence,Scale,93 Raid Cards,reward,93,Raid Cards
+116,Power,Power,1 Legendary Equipment,reward,1,Legendary Equipment
+117,Power,Beetle,Tooth,ingredient,1,Tooth
+118,Power,Tooth,164 Currency,reward,164,Currency
+119,Power,Flame,41 Wildcards,reward,41,Wildcards
+120,Power,Steel,164 Currency,reward,164,Currency
+121,Power,Scale,280 Currency,reward,280,Currency
+122,Beetle,Beetle,4 Skill Points,reward,4,Skill Points
+123,Beetle,Tooth,8 Fortune Weapons,reward,8,Fortune Weapons
+124,Beetle,Flame,6 Skill Points,reward,6,Skill Points
+125,Beetle,Steel,2 Fortune Scroll,reward,2,Fortune Scroll
+126,Beetle,Scale,11 Skill Points,reward,11,Skill Points
+127,Tooth,Tooth,220 Currency,reward,220,Currency
+128,Tooth,Flame,55 Wildcards,reward,55,Wildcards
+129,Tooth,Steel,11 Fortune Weapons,reward,11,Fortune Weapons
+130,Tooth,Scale,16 Fortune Weapons,reward,16,Fortune Weapons
+131,Flame,Flame,220 Currency,reward,220,Currency
+132,Flame,Steel,Scale,ingredient,1,Scale
+133,Flame,Scale,84 Wildcards,reward,84,Wildcards
+134,Steel,Steel,220 Currency,reward,220,Currency
+135,Steel,Scale,4 Fortune Scroll,reward,4,Fortune Scroll
+136,Scale,Scale,1 Event Equipment,reward,1,Event Equipment
