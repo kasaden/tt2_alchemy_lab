@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseAlchemyData, validateAlchemyData } from "../lib/csv.js";
-import { buildModel, toVector } from "../lib/model.js";
+import { buildModel, toObjective, toVector } from "../lib/model.js";
 import { optimize } from "../lib/optimizer.js";
 import { expandPlan, simulatePlan } from "../lib/plan.js";
 import { stateSearch } from "../lib/stateSearch.js";
@@ -42,7 +42,11 @@ const inv = (model, counts) => toVector(model, counts);
 function expectExecutable(model, res) {
   const sim = simulatePlan(model, res.initial, expandPlan(res.steps));
   assert.ok(sim.ok, sim.error);
-  assert.equal(sim.rewards[res.target] ?? 0, res.value);
+  const weights = toObjective(res.objective);
+  let weighted = 0;
+  for (const [name, quantity] of Object.entries(sim.rewards)) weighted += (weights.get(name) ?? 0) * quantity;
+  assert.equal(weighted, res.value);
+  assert.deepEqual(sim.rewards, res.rewards);
   assert.deepEqual(sim.final, res.remaining);
   // Every step's inventory snapshot must be non-negative.
   for (const s of res.steps) assert.ok(s.inventoryAfter.every((v) => v >= 0));
@@ -193,6 +197,97 @@ describe("synthetic scenarios", () => {
   });
 });
 
+describe("weighted objectives", () => {
+  // A + B -> 10 X and A + A -> 3 Y compete for the same A
+  const make = () => makeModel(["A", "B"], [
+    ["A", "B", "X", 10],
+    ["A", "A", "Y", 3]
+  ]);
+
+  it("the weights decide which reward gets the shared ingredient", () => {
+    const m = make();
+    const stock = inv(m, { A: 2, B: 1 });
+
+    const evenly = optimize(m, stock, { X: 1, Y: 1 });
+    assert.equal(evenly.value, 10);
+    assert.deepEqual(evenly.rewards, { X: 10 });
+    assert.equal(evenly.target, null);
+
+    const favouringY = optimize(m, stock, { X: 1, Y: 10 });
+    assert.equal(favouringY.value, 30);
+    assert.deepEqual(favouringY.rewards, { Y: 3 });
+    expectExecutable(m, favouringY);
+  });
+
+  it("a mixed plan pays several rewards when there is enough for both", () => {
+    const m = make();
+    const res = optimize(m, inv(m, { A: 3, B: 1 }), { X: 2, Y: 5 });
+    // A + B -> 10 X (20 points), then A + A -> 3 Y (15 points)
+    assert.equal(res.value, 35);
+    assert.deepEqual(res.rewards, { X: 10, Y: 3 });
+    expectExecutable(m, res);
+  });
+
+  it("one reward of weight 1 behaves like naming the reward", () => {
+    const m = make();
+    const stock = inv(m, { A: 4, B: 1 });
+    const byName = optimize(m, stock, "X");
+    const byWeight = optimize(m, stock, { X: 1 });
+    assert.equal(byName.value, byWeight.value);
+    assert.deepEqual(byName.rewards, byWeight.rewards);
+    assert.equal(byWeight.target, "X");
+  });
+
+  it("a weight of 0 ignores the reward, and no weight at all gives nothing", () => {
+    const m = make();
+    const stock = inv(m, { A: 2, B: 1 });
+    assert.deepEqual(optimize(m, stock, { X: 0, Y: 4 }).rewards, { Y: 3 });
+    const none = optimize(m, stock, { X: 0, Y: 0 });
+    assert.equal(none.value, 0);
+    assert.deepEqual(none.steps, []);
+  });
+
+  it("rejects weights that are not whole numbers", () => {
+    const m = make();
+    assert.throws(() => optimize(m, [1, 1], { X: 1.5 }), /whole number/);
+    assert.throws(() => optimize(m, [1, 1], { X: -1 }), /whole number/);
+  });
+
+  it("agrees with the exhaustive state search on random weights", () => {
+    const m = alchemyModel;
+    let seed = 777;
+    const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    for (let trial = 0; trial < 40; trial++) {
+      const vec = new Array(m.ingredients.length).fill(0);
+      const picks = 3 + Math.floor(rand() * 4);
+      for (let k = 0; k < picks; k++) vec[Math.floor(rand() * vec.length)] += 1 + Math.floor(rand() * 3);
+      const objective = {};
+      for (const name of m.rewardNames) if (rand() < 0.4) objective[name] = 1 + Math.floor(rand() * 30);
+
+      const fast = optimize(m, vec, objective);
+      const ref = stateSearch(m, vec, objective, { maxStates: 400_000 });
+      assert.equal(fast.value, ref.value, `${JSON.stringify(objective)} ${vec.join(",")}`);
+      assert.equal(
+        fast.remaining.reduce((a, b) => a + b, 0),
+        ref.remaining.reduce((a, b) => a + b, 0)
+      );
+      expectExecutable(m, fast);
+    }
+  });
+
+  it("solves a mixed objective on a mid-size inventory exactly", () => {
+    const m = alchemyModel;
+    const inventory = toVector(m, {
+      Pepper: 40, Berries: 35, Mushroom: 30, Sand: 6, Petal: 5, Acorn: 4, Feather: 3, Shadow: 3,
+      Spirit: 2, Essence: 2, Power: 1, Beetle: 1, Tooth: 1, Flame: 1, Steel: 1, Scale: 0
+    });
+    const objective = { "Crafting Shards": 3, Eggs: 20, "Skill Points": 35, Currency: 1, "Perk Tickets": 12, Wildcards: 4 };
+    const res = optimize(m, inventory, objective);
+    assert.equal(res.exact, true);
+    expectExecutable(m, res);
+  });
+});
+
 describe("CSV data", () => {
   it("parses 16 ingredients and 136 consistent recipes", () => {
     assert.equal(alchemyData.ingredients.length, 16);
@@ -200,6 +295,32 @@ describe("CSV data", () => {
     assert.equal(alchemyData.ingredients[15], "Scale");
     assert.equal(alchemyData.recipes.length, 136);
     assert.deepEqual(dataProblems, []);
+  });
+
+  it("Steel + Essence gives 2 Clan Scroll, Flame + Essence gives Currency and a first-time avatar", () => {
+    const pair = (a, b) =>
+      alchemyData.recipes.find((r) => [r.ingredient1, r.ingredient2].sort().join() === [a, b].sort().join());
+
+    const steel = pair("Steel", "Essence");
+    assert.equal(steel.result, "2 Clan Scroll");
+    assert.equal(steel.quantity, 2);
+    assert.equal(steel.resultName, "Clan Scroll");
+    assert.equal(steel.bonus, "");
+
+    const flame = pair("Flame", "Essence");
+    assert.equal(flame.resultName, "Currency");
+    assert.equal(flame.quantity, 108);
+    assert.equal(flame.bonus, "Avatar (first time)");
+
+    assert.equal(alchemyData.recipes.filter((r) => r.bonus).length, 1);
+  });
+
+  it("a bonus rides along in the plan but is never counted in the value", () => {
+    const m = alchemyModel;
+    const res = optimize(m, toVector(m, { Flame: 1, Essence: 1 }), "Currency");
+    assert.equal(res.value, 108);
+    assert.equal(res.steps[0].recipe.bonus, "Avatar (first time)");
+    assert.deepEqual(res.rewards, { Currency: 108 });
   });
 
   it("derives reward names from the CSV", () => {
