@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Find the best crafting path for your Tap Titans 2 Alchemy Lab inventory." />
   <meta name="theme-color" content="#1b1c24" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="TT2 Alchemy Optimizer" />
+  <meta property="og:title" content="Alchemy Lab optimizer for Tap Titans 2" />
+  <meta property="og:description" content="Enter your ingredients, pick a reward, get the exact crafting plan that maximises it." />
+  <meta property="og:url" content="https://kasaden.github.io/tt2_alchemy_lab/" />
+  <meta name="twitter:card" content="summary" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <title>TT2 Alchemy Optimizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -28,11 +35,26 @@
         <p>Best crafting path for the Alchemy Lab event of Tap Titans 2</p>
       </div>
     </div>
-    <a class="topbar-link" href="tt2_alchemy_v8_2_recipes.csv">Recipes (CSV)</a>
+    <a class="topbar-link" href="https://docs.google.com/spreadsheets/d/1o95Ipwx6NIyFV3LCz9LGNbH9_WELHF-pbpkM31YwXyY/edit?gid=1745300311#gid=1745300311" target="_blank" rel="noopener">Community spreadsheet</a>
   </header>
 
   <main id="content" class="page" tabindex="-1">
     <div id="dataNotice" class="notice notice-error" role="alert" hidden></div>
+
+    <ol class="howto" aria-label="How it works">
+      <li>
+        <span class="step-num" aria-hidden="true">1</span>
+        <div><strong>Enter what you own</strong><span>How many of each ingredient you have.</span></div>
+      </li>
+      <li>
+        <span class="step-num" aria-hidden="true">2</span>
+        <div><strong>Choose what you want</strong><span>One reward, or a value for each reward.</span></div>
+      </li>
+      <li>
+        <span class="step-num" aria-hidden="true">3</span>
+        <div><strong>Press Optimize</strong><span>You get the crafts to make, in order.</span></div>
+      </li>
+    </ol>
 
     <div class="layout">
       <div class="col-input">
@@ -45,28 +67,44 @@
             <div class="toolbar">
               <button id="loadExampleBtn" type="button" class="btn">Load example</button>
               <button id="addAllBtn" type="button" class="btn">+1 to all</button>
-              <button id="clearBtn" type="button" class="btn">Clear inventory</button>
-              <button id="resetAllBtn" type="button" class="btn btn-danger">Reset all</button>
+              <button id="clearBtn" type="button" class="btn" title="Set every ingredient to 0">Empty inventory</button>
+              <button id="resetAllBtn" type="button" class="btn btn-danger" title="Empty the inventory, go back to one reward and clear every value">Reset everything</button>
             </div>
           </header>
           <div id="inventoryGrid" class="inventory-grid"></div>
+          <p class="legend">
+            <strong>Base</strong> ingredients cannot be crafted. <strong>T1</strong> to <strong>T5</strong> are the
+            number of crafting steps between an ingredient and the base ones.
+          </p>
         </section>
 
         <section class="card card-cloth" aria-labelledby="target-title">
           <header class="card-header">
             <div>
-              <h2 id="target-title" class="card-title"><span class="step-num">2</span> Target reward</h2>
-              <p class="card-sub">The resource to maximise. The number is the best single recipe, not the optimum.</p>
+              <h2 id="target-title" class="card-title"><span class="step-num">2</span> Objective</h2>
+              <p id="objectiveSub" class="card-sub"></p>
             </div>
+            <div id="modeSwitch" class="segmented segmented-cloth" role="radiogroup" aria-label="Objective mode"></div>
           </header>
           <div id="targetGrid" class="target-grid" role="radiogroup" aria-labelledby="target-title"></div>
+          <div id="expertPanel" hidden>
+            <p class="expert-hint">
+              Example: 20 for Pets / Eggs and 35 for Skill Points means one Skill Point is worth as much as 1.75 eggs.
+              Whole numbers only.
+            </p>
+            <div id="weightsGrid" class="weights-grid"></div>
+            <div class="expert-foot">
+              <button id="resetWeightsBtn" type="button" class="btn btn-sm">Reset values</button>
+            </div>
+          </div>
         </section>
       </div>
 
       <div class="col-result">
         <div class="optimize-bar">
+          <span class="step-num" aria-hidden="true">3</span>
           <button id="optimizeBtn" type="button" class="btn btn-primary btn-optimize">Optimize</button>
-          <span class="optimize-hint">Maximise <strong id="targetLabel"></strong></span>
+          <span id="optimizeHint" class="optimize-hint"></span>
         </div>
         <div id="result"></div>
       </div>
@@ -78,38 +116,44 @@
           <h2 id="recipes-title" class="card-title">Recipe Book</h2>
           <p id="recipesSub" class="card-sub"></p>
         </div>
+        <div id="bookView" class="segmented" role="radiogroup" aria-label="Recipe book view"></div>
       </header>
 
-      <div class="filters">
-        <input id="searchInput" type="search" class="field field-search" placeholder="Search, e.g. Crafting Shards" aria-label="Search recipes" />
-        <select id="ing1Select" class="field" aria-label="Ingredient 1"></select>
-        <select id="ing2Select" class="field" aria-label="Ingredient 2"></select>
-        <select id="resultSelect" class="field" aria-label="Result"></select>
-        <div id="kindFilter" class="segmented" role="radiogroup" aria-label="Result kind"></div>
-        <button id="clearFiltersBtn" type="button" class="btn btn-sm" hidden>Clear filters</button>
+      <div id="tableView">
+        <div class="filters">
+          <input id="searchInput" type="search" class="field field-search" placeholder="Search, e.g. Crafting Shards" aria-label="Search recipes" />
+          <select id="ing1Select" class="field" aria-label="Ingredient 1"></select>
+          <select id="ing2Select" class="field" aria-label="Ingredient 2"></select>
+          <select id="resultSelect" class="field" aria-label="Result"></select>
+          <div id="kindFilter" class="segmented" role="radiogroup" aria-label="Result kind"></div>
+          <button id="clearFiltersBtn" type="button" class="btn btn-sm" hidden>Clear filters</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="recipes">
+            <thead>
+              <tr>
+                <th class="num">#</th>
+                <th>Ingredient 1</th>
+                <th>Ingredient 2</th>
+                <th>Result</th>
+                <th>Kind</th>
+              </tr>
+            </thead>
+            <tbody id="recipeBody"></tbody>
+          </table>
+        </div>
       </div>
 
-      <div class="table-wrap">
-        <table class="recipes">
-          <thead>
-            <tr>
-              <th class="num">#</th>
-              <th>Ingredient 1</th>
-              <th>Ingredient 2</th>
-              <th>Result</th>
-              <th>Kind</th>
-            </tr>
-          </thead>
-          <tbody id="recipeBody"></tbody>
-        </table>
-      </div>
+      <div id="matrixView" class="matrix-wrap" hidden></div>
     </section>
   </main>
 
   <footer class="site-footer">
     <p class="credits">
-      The recipes on this site are read from <code>tt2_alchemy_v8_2_recipes.csv</code> and
-      <code>tt2_alchemy_v8_2_ingredients.csv</code>. Your inventory is stored only in this browser.
+      The recipes on this site are read from the
+      <a href="https://docs.google.com/spreadsheets/d/1o95Ipwx6NIyFV3LCz9LGNbH9_WELHF-pbpkM31YwXyY/edit?gid=1745300311#gid=1745300311" target="_blank" rel="noopener">community spreadsheet</a>.
+      Thanks to rawrzcookie for setting it up, and to everyone who keeps it up to date.
     </p>
     <p>
       UNOFFICIAL. Tap Titans 2 is a trademark of Game Hive Corp.

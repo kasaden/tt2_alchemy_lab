@@ -1,11 +1,13 @@
 import { parseAlchemyData, validateAlchemyData } from "./lib/csv.js";
-import { bestDirectQuantity, buildModel, toVector } from "./lib/model.js";
+import { MAX_WEIGHT, bestDirectQuantity, buildModel, toVector } from "./lib/model.js";
 
 const INGREDIENTS_CSV = "tt2_alchemy_v8_2_ingredients.csv";
 const RECIPES_CSV = "tt2_alchemy_v8_2_recipes.csv";
 
 const INVENTORY_KEY = "tt2-alchemy:inventory:v1";
 const TARGET_KEY = "tt2-alchemy:target:v1";
+const MODE_KEY = "tt2-alchemy:mode:v1";
+const WEIGHTS_KEY = "tt2-alchemy:weights:v1";
 const MAX_COUNT = 99999;
 
 // friendlier display names; internal values stay the CSV result_name
@@ -51,6 +53,12 @@ const ICONS = {
   Scale: "🐉"
 };
 
+// the names say what each mode does; the keys stay standard / expert
+const MODES = [
+  ["standard", "One reward"],
+  ["expert", "Mix of rewards"]
+];
+
 const KINDS = [
   ["all", "All"],
   ["ingredient", "Ingredient"],
@@ -64,14 +72,22 @@ const state = {
   bestDirect: {},
   inventory: [],
   target: "",
+  // standard: one reward, one point a unit. expert: a value per reward, the best mix wins
+  mode: "standard",
+  weights: {},
   // idle | running | done | error
   optimizer: { status: "idle" },
   showInventory: false,
+  planView: "list",
+  walkIndex: 0,
+  bookView: "table",
+  shown: 0,
   filters: { query: "", ing1: "", ing2: "", result: "", kind: "all" }
 };
 
 const els = {};
 const fields = [];
+const weightFields = {};
 let worker = null;
 let requestId = 0;
 
@@ -118,7 +134,12 @@ function clampCount(v) {
   return Math.min(MAX_COUNT, Math.max(0, Math.floor(v)));
 }
 
-const inventoryKey = (inventory, target) => `${target}|${inventory.join(",")}`;
+function clampWeight(v) {
+  if (!Number.isFinite(v)) return 0;
+  return Math.min(MAX_WEIGHT, Math.max(0, Math.floor(v)));
+}
+
+const inventoryKey = (inventory, objective) => `${objective}|${inventory.join(",")}`;
 
 /* ---------- storage (failures are ignored: private mode, quota, blocked storage) ---------- */
 
@@ -160,6 +181,18 @@ function loadTarget() {
   return typeof stored === "string" && state.rewards.includes(stored) ? stored : defaultTarget();
 }
 
+function loadMode() {
+  return readStored(MODE_KEY) === "expert" ? "expert" : "standard";
+}
+
+// stored as a name -> weight record, unknown names and bad values are dropped
+function loadWeights() {
+  const stored = readStored(WEIGHTS_KEY);
+  const record = stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
+
+  return Object.fromEntries(state.rewards.map((reward) => [reward, clampWeight(Number(record[reward] ?? 0))]));
+}
+
 /* ---------- inventory ---------- */
 
 function setInventory(next) {
@@ -167,6 +200,8 @@ function setInventory(next) {
   saveInventory();
   updateInventory();
   updateStale();
+  updateOptimizeBar();
+  if (state.optimizer.status === "idle") renderResult();
 }
 
 function setOne(index, count) {
@@ -282,16 +317,59 @@ function updateInventory() {
   });
 
   const total = state.inventory.reduce((sum, v) => sum + v, 0);
-  els.inventorySub.textContent = `${formatNumber(total)} ingredients · arrow keys adjust, Shift for ±10`;
+  els.inventorySub.textContent = `${formatNumber(total)} ingredients · saved in this browser only · arrow keys adjust, Shift for ±10`;
   els.clearBtn.disabled = total === 0;
 }
 
-/* ---------- target ---------- */
+/* ---------- objective ---------- */
+
+// what the optimizer is asked for: one reward by name (Standard), or the weights of the rewards
+// that count (Expert). Same split as the Sheet and tt2.bagu.biz: a plain target, or a value per reward.
+function currentObjective() {
+  if (state.mode === "standard") return state.target;
+  return Object.fromEntries(Object.entries(state.weights).filter(([, weight]) => weight > 0));
+}
+
+const objectiveKey = () => `${state.mode}|${JSON.stringify(currentObjective())}`;
+
+const hasInventory = () => state.inventory.some((count) => count > 0);
+const hasValues = () => state.mode === "standard" || Object.values(state.weights).some((weight) => weight > 0);
+
+function canOptimize() {
+  return hasInventory() && hasValues();
+}
+
+// names of the rewards that currently count, for the highlights of the recipe matrix
+function countedRewards() {
+  const objective = currentObjective();
+  return new Set(typeof objective === "string" ? [objective] : Object.keys(objective));
+}
 
 function setTarget(reward) {
   state.target = reward;
   writeStored(TARGET_KEY, reward);
-  updateTarget();
+  updateObjective();
+  updateStale();
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  writeStored(MODE_KEY, mode);
+  updateObjective();
+  updateStale();
+}
+
+function setWeight(reward, weight) {
+  state.weights = { ...state.weights, [reward]: clampWeight(weight) };
+  writeStored(WEIGHTS_KEY, state.weights);
+  updateObjective();
+  updateStale();
+}
+
+function resetWeights() {
+  state.weights = Object.fromEntries(state.rewards.map((reward) => [reward, 0]));
+  writeStored(WEIGHTS_KEY, state.weights);
+  updateObjective();
   updateStale();
 }
 
@@ -310,7 +388,7 @@ function buildTargets() {
         el("span", { class: "target-name" }, rewardLabel(reward)),
         el(
           "span",
-          { class: "target-best", title: "Best quantity from a single direct recipe" },
+          { class: "target-best", title: "The most a single craft of this reward can give" },
           `≤${state.bestDirect[reward]}/craft`
         )
       )
@@ -318,14 +396,106 @@ function buildTargets() {
   );
 }
 
-function updateTarget() {
+function buildModeSwitch() {
+  els.modeSwitch.replaceChildren(
+    ...MODES.map(([mode, text]) =>
+      el("button", { type: "button", role: "radio", "data-mode": mode, onclick: () => setMode(mode) }, text)
+    )
+  );
+}
+
+// a value per reward: whole numbers, 0 leaves the reward out
+function buildWeights() {
+  els.weightsGrid.replaceChildren(
+    ...state.rewards.map((reward) => {
+      const id = `weight-${reward}`;
+
+      const input = el("input", {
+        id,
+        class: "weight-input",
+        type: "text",
+        inputmode: "numeric",
+        autocomplete: "off",
+        value: "0",
+        onfocus: (e) => e.target.select(),
+        onblur: (e) => {
+          setWeight(reward, Number.parseInt(e.target.value.replace(/\D/g, ""), 10) || 0);
+          e.target.value = String(state.weights[reward]);
+        },
+        oninput: (e) => {
+          const clean = e.target.value.replace(/\D/g, "").slice(0, String(MAX_WEIGHT).length);
+          e.target.value = clean;
+          if (clean !== "") setWeight(reward, Number.parseInt(clean, 10));
+        },
+        onkeydown: (e) => {
+          const step = e.shiftKey ? 10 : 1;
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setWeight(reward, state.weights[reward] + step);
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setWeight(reward, state.weights[reward] - step);
+          }
+        }
+      });
+
+      const row = el("div", { class: "weight-row" }, el("label", { for: id }, rewardLabel(reward)), input);
+      weightFields[reward] = { row, input, shown: 0 };
+      return row;
+    })
+  );
+}
+
+function updateObjective() {
+  const expert = state.mode === "expert";
+
   for (const chip of els.targetGrid.children) {
     const selected = chip.dataset.reward === state.target;
     chip.classList.toggle("selected", selected);
     chip.setAttribute("aria-checked", String(selected));
   }
 
-  els.targetLabel.textContent = rewardLabel(state.target);
+  for (const button of els.modeSwitch.children) {
+    const active = button.dataset.mode === state.mode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-checked", String(active));
+  }
+
+  els.targetGrid.hidden = expert;
+  els.expertPanel.hidden = !expert;
+  els.objectiveSub.textContent = expert
+    ? "Give each reward a value in points. The plan is the one with the highest total, so it can mix rewards. 0 leaves a reward out."
+    : "Pick the reward you want as much of as possible. The ≤ number is the most one craft can give.";
+
+  // typed text stays as it is while a field is being edited, the others follow the stored values
+  for (const [reward, field] of Object.entries(weightFields)) {
+    const weight = state.weights[reward] ?? 0;
+    if (field.shown !== weight) {
+      field.input.value = String(weight);
+      field.shown = weight;
+    }
+    field.row.classList.toggle("counts", weight > 0);
+  }
+
+  updateOptimizeBar();
+  updateMatrixHits();
+}
+
+function updateOptimizeBar() {
+  const running = state.optimizer.status === "running";
+
+  els.optimizeBtn.disabled = running || !canOptimize();
+  els.optimizeBtn.textContent = running ? "Optimizing…" : "Optimize";
+
+  els.optimizeHint.replaceChildren(
+    ...(!hasInventory()
+      ? ["Enter your ingredients first"]
+      : !hasValues()
+        ? ["Give at least one reward a value above 0 first"]
+        : state.mode === "standard"
+          ? ["Goal: as much ", el("strong", {}, rewardLabel(state.target)), " as possible"]
+          : ["Goal: the highest ", el("strong", {}, "total value")])
+  );
 }
 
 /* ---------- optimizer ---------- */
@@ -340,12 +510,18 @@ function runOptimizer() {
   stopWorker();
 
   const id = ++requestId;
-  const target = state.target;
+  const objective = currentObjective();
   const inventory = state.inventory.slice();
-  const key = inventoryKey(inventory, target);
+  const key = inventoryKey(inventory, objectiveKey());
 
   worker = new Worker("worker.js", { type: "module" });
-  setOptimizer({ status: "running", target });
+  setOptimizer({ status: "running" });
+
+  // on a narrow screen the result sits under the form, make sure you see it start
+  if (window.matchMedia("(max-width: 1040px)").matches) {
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    els.optimizeBtn.closest(".col-result").scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
+  }
 
   worker.onmessage = (e) => {
     if (e.data.id !== requestId) return;
@@ -363,7 +539,7 @@ function runOptimizer() {
     stopWorker();
   };
 
-  worker.postMessage({ id, data: state.data, inventory, target });
+  worker.postMessage({ id, data: state.data, inventory, objective });
 }
 
 function cancelOptimizer() {
@@ -374,29 +550,35 @@ function cancelOptimizer() {
 
 function setOptimizer(next) {
   state.optimizer = next;
-  if (next.status === "done") state.showInventory = false;
 
-  const running = next.status === "running";
-  els.optimizeBtn.disabled = running;
-  els.optimizeBtn.textContent = running ? "Optimizing…" : "Optimize";
+  if (next.status === "done") {
+    state.showInventory = false;
+    state.planView = "list";
+    state.walkIndex = 0;
+  }
 
+  updateOptimizeBar();
   renderResult();
 }
 
 function resetAll() {
   clearInventory();
-  setTarget(defaultTarget());
+  state.mode = "standard";
+  writeStored(MODE_KEY, state.mode);
+  state.target = defaultTarget();
+  writeStored(TARGET_KEY, state.target);
+  resetWeights();
   cancelOptimizer();
 }
 
-// the result on screen no longer matches the inventory or the target
+// the result on screen no longer matches the inventory or the objective
 function updateStale() {
   const notice = $("staleNotice");
   if (!notice) return;
 
   const { optimizer } = state;
   notice.hidden = !(
-    optimizer.status === "done" && optimizer.inventoryKey !== inventoryKey(state.inventory, state.target)
+    optimizer.status === "done" && optimizer.inventoryKey !== inventoryKey(state.inventory, objectiveKey())
   );
 }
 
@@ -410,13 +592,21 @@ function renderResult() {
     view = el(
       "section",
       { class: "card card-parchment result-card result-empty" },
-      el(
-        "p",
-        { class: "muted" },
-        "Enter your ingredients, pick a target and press ",
-        el("strong", {}, "Optimize"),
-        ". The optimizer explores every crafting chain, including intermediate ingredients, and returns the plan that maximises your target."
-      )
+      state.inventory.every((count) => count === 0)
+        ? el(
+            "p",
+            { class: "muted" },
+            "Your inventory is empty. Enter what you own on the left, or press ",
+            el("strong", {}, "Load example"),
+            " to see how it works."
+          )
+        : el(
+            "p",
+            { class: "muted" },
+            "Choose what you want, then press ",
+            el("strong", {}, "Optimize"),
+            ". You get the crafts to make, in order, and what they bring. Crafts that only make a stepping stone ingredient are included."
+          )
     );
   } else if (optimizer.status === "running") {
     view = el(
@@ -444,22 +634,81 @@ function renderResult() {
 
 function resultView(result) {
   const names = state.model.ingredients;
-  const label = rewardLabel(result.target);
+  // one reward worth 1 point a unit reads as "N of that reward", anything else as points
+  const plain = result.target !== null && result.objective[result.target] === 1;
+  const label = plain ? rewardLabel(result.target) : "points";
+  const rewardEntries = Object.entries(result.rewards).sort(
+    ([a, p], [b, q]) => q * result.objective[b] - p * result.objective[a]
+  );
+
+  const planBox = el("div", { class: "plan-box" });
   const planList = el("ol", { class: "plan enter" });
   const fillPlan = () =>
     planList.replaceChildren(
-      ...planItems(result, label).map((item, i) => {
+      ...planItems(result, plain ? label : "rewards").map((item, i) => {
         item.style.setProperty("--i", Math.min(i, 14));
         return item;
       })
     );
 
+  const toggleLabel = el("label", { class: "toggle" });
+  const viewSwitch = el("div", { class: "segmented", role: "radiogroup", "aria-label": "Plan view" });
+
+  // the plan is either the whole list or one step at a time, like the "Next step" of the Sheet
+  const renderPlanBox = (focus) => {
+    const walking = state.planView === "walk";
+    toggleLabel.hidden = walking;
+
+    for (const button of viewSwitch.children) {
+      const active = button.dataset.view === state.planView;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-checked", String(active));
+    }
+
+    planBox.replaceChildren(walking ? walkView(result, renderPlanBox) : planList);
+    if (focus) planBox.querySelector(focus)?.focus();
+  };
+
+  viewSwitch.append(
+    ...[
+      ["list", "List"],
+      ["walk", "Step by step"]
+    ].map(([view, text]) =>
+      el(
+        "button",
+        {
+          type: "button",
+          role: "radio",
+          "data-view": view,
+          onclick: () => {
+            state.planView = view;
+            renderPlanBox();
+          }
+        },
+        text
+      )
+    )
+  );
+
+  const toggle = el("input", {
+    type: "checkbox",
+    onchange: (e) => {
+      state.showInventory = e.target.checked;
+      fillPlan();
+    }
+  });
+  toggleLabel.append(toggle, "Inventory after each step");
+
   const copyButton = el("button", { type: "button", class: "btn btn-info btn-sm" }, "Copy plan");
   copyButton.addEventListener("click", async () => {
+    const summary = plain
+      ? `${formatNumber(result.value)} ${result.target}`
+      : `${formatNumber(result.value)} points (${rewardEntries.map(([n, q]) => `${formatNumber(q)} ${n}`).join(", ")})`;
     const lines = [
-      `TT2 Alchemy plan: ${formatNumber(result.value)} ${result.target}${result.exact ? " (optimal)" : ""}`,
+      `TT2 Alchemy plan: ${summary}${result.exact ? " (optimal)" : ""}`,
       ...result.steps.map(
-        (s, i) => `${i + 1}. ${s.times}× ${s.recipe.ingredient1} + ${s.recipe.ingredient2} → ${s.recipe.result}`
+        (s, i) =>
+          `${i + 1}. ${s.times}× ${s.recipe.ingredient1} + ${s.recipe.ingredient2} → ${s.recipe.result}${s.recipe.bonus ? ` (+ ${s.recipe.bonus})` : ""}`
       )
     ];
 
@@ -472,15 +721,8 @@ function resultView(result) {
     }
   });
 
-  const toggle = el("input", {
-    type: "checkbox",
-    onchange: (e) => {
-      state.showInventory = e.target.checked;
-      fillPlan();
-    }
-  });
-
   fillPlan();
+  renderPlanBox();
   // the entrance plays once: later refills (the inventory toggle) must not replay it
   setTimeout(() => planList.classList.remove("enter"), 1200);
 
@@ -493,7 +735,7 @@ function resultView(result) {
     el(
       "div",
       { id: "staleNotice", class: "notice", hidden: true },
-      "Inventory or target changed since this result. Press Optimize to refresh it."
+      "Inventory or objective changed since this result. Press Optimize to refresh it."
     ),
 
     el(
@@ -502,15 +744,30 @@ function resultView(result) {
       el(
         "div",
         {},
-        el("div", { class: "eyebrow" }, "Maximum achievable"),
+        el("div", { class: "eyebrow" }, plain ? "The most you can get" : "Best total value"),
         el("div", { class: "big-value" }, `${formatNumber(result.value)} `, el("span", { class: "big-unit" }, label))
       ),
       el(
         "span",
-        { class: `badge ${result.exact ? "badge-ok" : "badge-warn"}` },
-        result.exact ? "Proven optimal" : "Not proven optimal"
+        {
+          class: `badge ${result.exact ? "badge-ok" : "badge-warn"}`,
+          title: result.exact
+            ? "Checked by the optimizer: no other sequence of crafts does better with this inventory"
+            : "The search stopped early, a better plan may exist"
+        },
+        result.exact ? "Best possible" : "Best found, not proven"
       )
     ),
+
+    result.exact &&
+      result.value > 0 &&
+      el(
+        "p",
+        { class: "result-lead" },
+        plain
+          ? `No other sequence of crafts gives more ${label} from this inventory.`
+          : "No other sequence of crafts gives a higher total from this inventory."
+      ),
 
     !result.exact &&
       el(
@@ -523,22 +780,20 @@ function resultView(result) {
       ? el(
           "p",
           { class: "muted" },
-          `No sequence of crafts can produce ${label} from this inventory. Check the Recipe Book below to see which ingredients you need.`
+          plain
+            ? `No sequence of crafts can produce ${label} from this inventory. Check the Recipe Book below to see which ingredients you need.`
+            : "No sequence of crafts can produce a reward with a value above 0 from this inventory. Check the Recipe Book below to see which ingredients you need."
         )
       : [
           el(
             "div",
             { class: "section-row" },
-            el("h3", { class: "section-title" }, "Optimal plan"),
-            el(
-              "div",
-              { class: "toolbar" },
-              el("label", { class: "toggle" }, toggle, "Inventory after each step"),
-              copyButton
-            )
+            el("h3", { class: "section-title" }, "What to craft, in order"),
+            el("div", { class: "toolbar" }, viewSwitch, toggleLabel, copyButton)
           ),
-          planList,
-          el("h3", { class: "section-title" }, "Total rewards"),
+          el("p", { class: "plan-help" }, "Read each line as: do this craft that many times, top to bottom."),
+          planBox,
+          el("h3", { class: "section-title" }, "What you get"),
           el(
             "div",
             { class: "totals" },
@@ -548,10 +803,28 @@ function resultView(result) {
               { class: "muted small" },
               `${formatNumber(result.totalCrafts)} crafts · ${result.steps.length} distinct recipes`
             )
-          )
+          ),
+          !plain &&
+            el(
+              "div",
+              { class: "reward-list" },
+              rewardEntries.map(([name, quantity]) =>
+                el(
+                  "div",
+                  { class: "reward-chip" },
+                  el("span", { class: "reward-qty" }, formatNumber(quantity)),
+                  el("span", { class: "reward-name" }, rewardLabel(name)),
+                  el(
+                    "span",
+                    { class: "reward-pts" },
+                    `× ${formatNumber(result.objective[name])} = ${formatNumber(quantity * result.objective[name])}`
+                  )
+                )
+              )
+            )
         ],
 
-    el("h3", { class: "section-title" }, "Inventory remaining"),
+    el("h3", { class: "section-title" }, "What you have left"),
     el(
       "div",
       { class: "remaining-grid" },
@@ -579,20 +852,20 @@ function resultView(result) {
       el(
         "summary",
         {},
-        `${result.exact ? "Optimal solution" : "Best found"} · ${formatNumber(stats.nodesExplored)} search nodes · ${time} ms`
+        `How it was computed · ${formatNumber(stats.nodesExplored)} search nodes · ${time} ms`
       ),
       el(
         "dl",
         {},
-        el("dt", {}, "Exact result"),
-        el("dd", {}, result.exact ? "yes" : "no"),
-        el("dt", {}, "Engine"),
-        el("dd", {}, "Branch & cut on an integer program (one variable per useful recipe)"),
+        el("dt", {}, "Best possible?"),
+        el("dd", {}, result.exact ? "yes, proven" : "not proven, the search hit its safety limit"),
+        el("dt", {}, "Method"),
+        el("dd", {}, "an integer program with one variable per useful recipe, solved exactly (branch and cut)"),
         el("dt", {}, "Search nodes"),
         el("dd", {}, formatNumber(stats.nodesExplored)),
         el("dt", {}, "LP relaxations solved"),
         el("dd", {}, formatNumber(stats.lpSolved)),
-        el("dt", {}, "Plan verified"),
+        el("dt", {}, "Plan checked"),
         el("dd", {}, "yes, replayed craft by craft from your inventory")
       ),
       result.notes.map((note) => el("p", { class: "muted small" }, note))
@@ -601,19 +874,19 @@ function resultView(result) {
 }
 
 // intermediates first, then the reward crafts; each row needs the inventory before it for the diff
-function planItems(result, label) {
+function planItems(result, rewardsLabel) {
   const transforms = result.steps.filter((s) => s.phase === "transform");
   const rewards = result.steps.filter((s) => s.phase === "reward");
   const items = [];
 
-  if (transforms.length > 0) items.push(el("li", { class: "plan-phase" }, "Craft intermediate ingredients"));
+  if (transforms.length > 0) items.push(el("li", { class: "plan-phase" }, "First, make these ingredients"));
 
   transforms.forEach((step, i) => {
     const prev = i === 0 ? result.initial : transforms[i - 1].inventoryAfter;
     items.push(stepRow(step, i + 1, prev));
   });
 
-  items.push(el("li", { class: "plan-phase" }, `Craft ${label}`));
+  items.push(el("li", { class: "plan-phase" }, `Then craft ${rewardsLabel}`));
 
   rewards.forEach((step, i) => {
     const prev =
@@ -644,7 +917,8 @@ function stepRow(step, index, prev) {
         "span",
         { class: `pill ${isReward ? "pill-reward" : "pill-made"}` },
         isReward ? r.result : [icon(r.resultName), r.resultName]
-      )
+      ),
+      r.bonus && el("span", { class: "bonus-tag", title: "A one-off extra, not counted in the total" }, `+ ${r.bonus}`)
     ),
     isReward && el("span", { class: "plan-gain" }, `+${formatNumber(step.gained)}`),
     state.showInventory &&
@@ -659,6 +933,112 @@ function stepRow(step, index, prev) {
           return el("span", { class: `inv-chip${d < 0 ? " down" : d > 0 ? " up" : ""}` }, `${name} ${formatNumber(v)}`);
         })
       )
+  );
+}
+
+/* ---------- step by step ---------- */
+
+// the start, one entry per grouped step, the end: what you do and what you hold afterwards
+function walkSteps(result) {
+  const all = [
+    {
+      text: "This is your starting inventory. Press Next to begin.",
+      inventory: result.initial
+    }
+  ];
+
+  for (const step of result.steps) {
+    const r = step.recipe;
+
+    all.push({
+      text:
+        step.phase === "transform"
+          ? `Craft ${formatNumber(step.times)} ${r.resultName} by combining ${r.ingredient1} and ${r.ingredient2}.`
+          : `Craft ${r.ingredient1} + ${r.ingredient2}, ${formatNumber(step.times)} ${step.times === 1 ? "time" : "times"}, to get ${formatNumber(step.gained)} ${rewardLabel(r.resultName)}${r.bonus ? `, plus ${r.bonus}` : ""}.`,
+      inventory: step.inventoryAfter
+    });
+  }
+
+  all.push({ text: "There is nothing left to craft. This is what remains.", inventory: result.remaining });
+  return all;
+}
+
+function walkView(result, rerender) {
+  const all = walkSteps(result);
+  const last = all.length - 1;
+  const index = Math.min(state.walkIndex, last);
+  const previous = all[Math.max(0, index - 1)].inventory;
+
+  const go = (delta, focus) => {
+    state.walkIndex = Math.max(0, Math.min(last, index + delta));
+    rerender(focus);
+  };
+
+  const count = index === 0 ? "Start" : index === last ? "Done" : `Step ${index} of ${last - 1}`;
+
+  return el(
+    "div",
+    {
+      class: "walk",
+      tabindex: "0",
+      role: "group",
+      "aria-label": "Step by step crafting, use the left and right arrow keys",
+      onkeydown: (e) => {
+        if (e.key === "ArrowRight" && index < last) {
+          e.preventDefault();
+          go(1, ".walk");
+        } else if (e.key === "ArrowLeft" && index > 0) {
+          e.preventDefault();
+          go(-1, ".walk");
+        }
+      }
+    },
+    el(
+      "div",
+      { class: "walk-top" },
+      el("span", { class: "walk-count" }, count),
+      el(
+        "div",
+        { class: "walk-bar", "aria-hidden": "true" },
+        el("span", { style: `width: ${(index / last) * 100}%` })
+      )
+    ),
+    el("p", { class: "walk-text" }, all[index].text),
+    el(
+      "div",
+      { class: "walk-nav" },
+      el(
+        "button",
+        { type: "button", class: "btn", disabled: index === 0, "data-walk": "prev", onclick: () => go(-1, '[data-walk="prev"]') },
+        "← Previous"
+      ),
+      el(
+        "button",
+        { type: "button", class: "btn btn-info", disabled: index === last, "data-walk": "next", onclick: () => go(1, '[data-walk="next"]') },
+        "Next →"
+      )
+    ),
+    el(
+      "div",
+      { class: "remaining-grid" },
+      state.model.ingredients.map((name, i) => {
+        const now = all[index].inventory[i];
+        const before = previous[i];
+        const change = index === 0 ? 0 : now - before;
+
+        return el(
+          "div",
+          { class: `remaining${now === 0 && change === 0 ? " zero" : ""}${change > 0 ? " up" : change < 0 ? " down" : ""}` },
+          el("span", { class: "remaining-name" }, icon(name), name),
+          el(
+            "span",
+            { class: "remaining-count" },
+            change !== 0 && el("span", { class: "was" }, `${formatNumber(before)} → `),
+            formatNumber(now)
+          )
+        );
+      })
+    )
   );
 }
 
@@ -735,7 +1115,8 @@ function renderRecipes() {
   const filters = state.filters;
   const filtered = recipes.filter(matchesFilters);
 
-  els.recipesSub.textContent = `${filtered.length} of ${recipes.length} recipes, loaded from the CSV files`;
+  state.shown = filtered.length;
+  updateBookSub();
 
   for (const button of els.kindFilter.children) {
     const active = button.dataset.kind === filters.kind;
@@ -761,7 +1142,8 @@ function renderRecipes() {
       el(
         "td",
         { class: r.kind === "reward" ? "reward-cell" : "made-cell" },
-        r.kind === "reward" ? `${r.quantity} ${rewardLabel(r.resultName)}` : [icon(r.resultName), r.resultName]
+        r.kind === "reward" ? `${r.quantity} ${rewardLabel(r.resultName)}` : [icon(r.resultName), r.resultName],
+        r.bonus && el("span", { class: "bonus-tag" }, `+ ${r.bonus}`)
       ),
       el("td", {}, el("span", { class: `kind kind-${r.kind}` }, r.kind === "reward" ? "Reward" : "Ingredient"))
     )
@@ -783,6 +1165,98 @@ function clearFilters() {
   els.ing2Select.value = "";
   els.resultSelect.value = "";
   renderRecipes();
+}
+
+function updateBookSub() {
+  const total = state.data.recipes.length;
+
+  els.recipesSub.textContent =
+    state.bookView === "table"
+      ? `${state.shown} of ${total} recipes. Every pair of ingredients gives one result.`
+      : `All ${total} pairs, like the recipe matrix of the Sheet. Gold cells pay the rewards that count in your objective.`;
+}
+
+function setBookView(view) {
+  state.bookView = view;
+  els.tableView.hidden = view !== "table";
+  els.matrixView.hidden = view !== "matrix";
+
+  for (const button of els.bookView.children) {
+    const active = button.dataset.view === view;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-checked", String(active));
+  }
+
+  updateBookSub();
+}
+
+function buildBookView() {
+  els.bookView.replaceChildren(
+    ...[
+      ["table", "Table"],
+      ["matrix", "Matrix"]
+    ].map(([view, text]) =>
+      el("button", { type: "button", role: "radio", "data-view": view, onclick: () => setBookView(view) }, text)
+    )
+  );
+}
+
+function matrixCell(recipe) {
+  const reward = recipe.kind === "reward";
+
+  return el(
+    "td",
+    {
+      class: `mx ${reward ? "mx-reward" : "mx-made"}`,
+      "data-result": recipe.resultName,
+      title: `${recipe.ingredient1} + ${recipe.ingredient2} = ${recipe.result}${recipe.bonus ? `, plus ${recipe.bonus}` : ""}`
+    },
+    reward
+      ? [el("strong", {}, formatNumber(recipe.quantity)), el("span", {}, rewardLabel(recipe.resultName))]
+      : [icon(recipe.resultName), el("span", {}, recipe.resultName)],
+    recipe.bonus && el("em", { class: "mx-bonus" }, `+ ${recipe.bonus}`)
+  );
+}
+
+// every pair once: a + b is the same craft as b + a, so only the upper triangle is filled
+function buildMatrix() {
+  const names = state.data.ingredients;
+  const byPair = new Map();
+
+  for (const r of state.model.recipes) {
+    byPair.set(`${Math.min(r.in1, r.in2)},${Math.max(r.in1, r.in2)}`, r.recipe);
+  }
+
+  const head = el(
+    "tr",
+    {},
+    el("th", { class: "mx-corner", scope: "col" }, "+"),
+    names.map((name) => el("th", { class: "mx-head", scope: "col" }, icon(name), el("span", {}, name)))
+  );
+
+  const rows = names.map((rowName, i) =>
+    el(
+      "tr",
+      {},
+      el("th", { class: "mx-side", scope: "row" }, icon(rowName), rowName),
+      names.map((_, j) => {
+        const recipe = byPair.get(`${i},${j}`);
+        return j < i || !recipe ? el("td", { class: "mx mx-skip", "aria-hidden": "true" }) : matrixCell(recipe);
+      })
+    )
+  );
+
+  els.matrixView.replaceChildren(
+    el("table", { class: "matrix", "aria-label": "Recipe matrix" }, el("thead", {}, head), el("tbody", {}, rows))
+  );
+}
+
+function updateMatrixHits() {
+  const counted = countedRewards();
+
+  for (const cell of els.matrixView.querySelectorAll("td[data-result]")) {
+    cell.classList.toggle("hit", counted.has(cell.dataset.result));
+  }
 }
 
 /* ---------- start ---------- */
@@ -813,6 +1287,7 @@ function bind() {
   els.clearBtn.addEventListener("click", clearInventory);
   els.resetAllBtn.addEventListener("click", resetAll);
   els.optimizeBtn.addEventListener("click", runOptimizer);
+  els.resetWeightsBtn.addEventListener("click", resetWeights);
 
   els.searchInput.addEventListener("input", (e) => {
     state.filters.query = e.target.value;
@@ -843,8 +1318,13 @@ async function init() {
     "resetAllBtn",
     "inventoryGrid",
     "targetGrid",
+    "modeSwitch",
+    "objectiveSub",
+    "expertPanel",
+    "weightsGrid",
+    "resetWeightsBtn",
     "optimizeBtn",
-    "targetLabel",
+    "optimizeHint",
     "result",
     "recipesSub",
     "searchInput",
@@ -853,7 +1333,10 @@ async function init() {
     "resultSelect",
     "kindFilter",
     "clearFiltersBtn",
-    "recipeBody"
+    "recipeBody",
+    "bookView",
+    "tableView",
+    "matrixView"
   ].forEach((id) => {
     els[id] = $(id);
   });
@@ -863,7 +1346,7 @@ async function init() {
   } catch (error) {
     console.error(error);
     els.dataNotice.textContent =
-      "Could not load the CSV files. Open this page through a web server (npm start), not from the file system.";
+      "Could not load the CSV files. Open this page through a web server (node server.js), not from the file system.";
     els.dataNotice.hidden = false;
     els.optimizeBtn.disabled = true;
     return;
@@ -885,23 +1368,32 @@ async function init() {
   state.bestDirect = bestDirectQuantity(state.model);
   state.inventory = loadInventory();
   state.target = loadTarget();
+  state.mode = loadMode();
+  state.weights = loadWeights();
 
   els.inventoryGrid.replaceChildren(
     ...state.model.ingredients.map((name, i) => buildIngredient(name, state.model.tier[i], i))
   );
 
   buildTargets();
+  buildModeSwitch();
+  buildWeights();
   buildRecipeFilters();
+  buildBookView();
+  buildMatrix();
   bind();
 
   updateInventory();
-  updateTarget();
+  updateObjective();
   renderRecipes();
+  setBookView(state.bookView);
   renderResult();
 
   // like the app always did, whatever was read is written back right away
   saveInventory();
   writeStored(TARGET_KEY, state.target);
+  writeStored(MODE_KEY, state.mode);
+  writeStored(WEIGHTS_KEY, state.weights);
 }
 
 init();
