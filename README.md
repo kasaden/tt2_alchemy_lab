@@ -2,31 +2,41 @@
 
 A visual planner and **exact optimizer** for the Alchemy Lab event in Tap Titans 2.
 
-Enter how many of each of the 16 ingredients you own, pick the reward you want (Crafting Shards, Pets / Eggs, Wildcards, Skill Points, Raid Cards, Currency…), and the app computes the sequence of crafts that **maximises** that reward. That includes chains through intermediate ingredients (`A + B → C`, `C + D → E`, `E + F → reward`), not only direct recipes.
+**Site:** https://kasaden.github.io/tt2_alchemy_lab/
+
+Enter how many of each of the 16 ingredients you own, pick the reward you want (Crafting Shards, Pets / Eggs, Wildcards, Skill Points, Raid Cards, Currency…), or give each reward a value, and the app computes the sequence of crafts that **maximises** it. That includes chains through intermediate ingredients (`A + B → C`, `C + D → E`, `E + F → reward`), not only direct recipes.
+
+It is inspired by the community optimizer spreadsheet made for this event (a value per reward, a step by step walkthrough, a recipe matrix) and by [tt2.bagu.biz](https://tt2.bagu.biz/) (a single reward, or a mix with values). The engine is its own: it is exact, and it says so when it is not.
 
 100 % client-side, plain HTML, CSS and JavaScript: no framework, no build step. No backend, and your inventory stays in your browser (`localStorage`).
 
 ## Features
 
 - **Inventory**: the 16 ingredients in CSV order, with −/+ steppers, typed input, arrow keys (Shift for ±10), *Load example*, *+1 to all*, *Clear inventory* and *Reset all*. Saved automatically.
-- **Target reward**: generated from the reward recipes in the CSV (`Eggs` is shown as *Pets / Eggs*). Each chip shows the best quantity from a single recipe, for information only.
+- **Objective**, two modes:
+  - **One reward** (Standard in the code): one target reward, generated from the reward recipes in the CSV (`Eggs` is shown as *Pets / Eggs*). Each chip shows the best quantity from a single recipe, for information only.
+  - **Mix of rewards** (Expert in the code): a whole-number value for every reward (0 leaves it out). The optimizer maximises the total value, so the plan can mix rewards, for instance eggs and perk tickets from the same ingredients. Values are saved in your browser.
 - **Optimize**: runs in a Web Worker, so the page stays responsive. You get:
-  - **Maximum achievable** and whether it is *proven optimal*;
-  - **Optimal plan**: grouped steps (`19× Pepper + Berries → Sand`), intermediates first, then the reward crafts, with an optional inventory snapshot after each step and *Copy plan*;
-  - **Total rewards**, **Inventory remaining**;
+  - **The most you can get**, and whether it is **Best possible** (proven: no other sequence of crafts does better) or only **Best found, not proven**;
+  - **Optimal plan**: grouped steps (`19× Pepper + Berries → Sand`), intermediates first, then the reward crafts, with an optional inventory snapshot after each step and *Copy plan*. A **Step by step** view walks through it one step at a time (Previous / Next, or the arrow keys) and shows what you should hold after each one;
+  - **What you get** (in Mix of rewards, what each reward brings) and **What you have left**;
   - a discreet stats line (search nodes, time, exact yes/no).
-- **Recipe Book**: all 136 recipes, with full-text search and filters by ingredient, result and kind (ingredient / reward).
+- **Recipe Book**: all 136 recipes, as a table with full-text search and filters by ingredient, result and kind (ingredient / reward), or as a 16 x 16 **matrix** where the rewards that count in your objective are highlighted.
+
+The page explains itself: three short steps at the top, a legend for the Base / T1 to T5 tags, plain section titles (*What to craft, in order*, *What you get*, *What you have left*), and a message next to the Optimize button that says what is missing (no ingredients yet, no value above 0). On a phone, pressing Optimize scrolls to the result.
 
 ## Data: the CSV files are the source of truth
 
-The game data is read from the two CSV files at the repository root. Nothing is copied into the code.
+The game data is read from the two CSV files at the repository root. Nothing is copied into the code. They are the recipes of the [community spreadsheet](https://docs.google.com/spreadsheets/d/1o95Ipwx6NIyFV3LCz9LGNbH9_WELHF-pbpkM31YwXyY/edit?gid=1745300311#gid=1745300311), exported to CSV.
 
 | File | Columns |
 | --- | --- |
 | `tt2_alchemy_v8_2_ingredients.csv` | `ingredient_id, ingredient` (16 rows, the order is used everywhere) |
-| `tt2_alchemy_v8_2_recipes.csv` | `recipe_id, ingredient_1, ingredient_2, result, result_kind, result_quantity, result_name` (136 rows) |
+| `tt2_alchemy_v8_2_recipes.csv` | `recipe_id, ingredient_1, ingredient_2, result, result_kind, result_quantity, result_name, bonus` (136 rows) |
 
 `result_kind` is `ingredient` (the craft produces 1 unit of `result_name`) or `reward` (the craft produces `result_quantity` × `result_name`).
+
+`bonus` is optional and empty for almost every recipe. It names a one-off extra the craft gives besides its result, for instance `Avatar (first time)` for Flame + Essence. It is shown in the Recipe Book, the matrix and the plan, but the optimizer does not count it: it is not a quantity.
 
 The page fetches the two files at startup and parses them in the browser. To update the recipes, replace the CSVs and reload. `validateAlchemyData` checks the data objectively: unknown ingredients, duplicate pairs, `result` ≠ `quantity + name`, the expected 136 = 16·17/2 unique pairs. Any problem is shown in a banner. **The current CSVs pass every check.** A cycle in ingredient production would be rejected with an explicit error.
 
@@ -42,8 +52,10 @@ Let `x_r ≥ 0` be the number of times recipe `r` is crafted. For each ingredien
 
 ```
 inventory_i + Σ(recipes producing i) x_r − Σ_r uses(r, i)·x_r ≥ 0      (uses = 2 for i + i)
-maximise  Σ(target recipes) quantity_r · x_r
+maximise  Σ(reward recipes) weight(reward_r) · quantity_r · x_r
 ```
+
+With one reward it has weight 1. With a mix of rewards every reward has the weight you gave it, which must be a whole number (the exact solver relies on an integer objective).
 
 **Why this is exact and not a relaxation of the real problem:** every craft sequence gives such a vector `x`. Conversely, ingredient production is acyclic: each ingredient gets a *tier*, and a recipe's inputs always have a lower tier than its output. So any integer `x` satisfying these inequalities can be executed by crafting the intermediates in increasing tier order and the rewards last (`plan.js`). Maximising over `x` is therefore exactly maximising over all craft sequences. The search runs over ≤ 62 integer variables instead of an exponential number of inventory states.
 
@@ -61,24 +73,28 @@ Every plan is **replayed craft by craft** from the initial inventory (`simulateP
 This is the memoised recursion `best(state) = max_r gain(r) + best(state after r)`. The state is the ingredient-count vector, the recursion terminates because every craft lowers the total ingredient count, and it includes path reconstruction and the same tie-break. Its state space grows like Π(countᵢ + 1), so it is only used on small inventories: as a cross-check in the tests and to complete the heuristic. It refuses (throws `StateLimitError`) rather than approximate.
 
 ### Safety limits
-Branch & cut has a node limit (250,000) and a time limit (15 s) per phase. If they are ever reached, the UI shows **"Not proven optimal"**, the best plan found and a proven upper bound ("the true maximum is at most …"). An approximation is never labelled optimal. In testing (realistic inventories of a few dozen per ingredient, and large ones of 150–240 per ingredient, for all 15 targets), every case finished proven optimal, typically in 1–500 ms.
+Branch & cut has a node limit (250,000) and a time limit (15 s) per phase. If they are ever reached, the UI shows **"Best found, not proven"**, the best plan found and a proven upper bound ("the true maximum is at most …"). An approximation is never labelled optimal. In testing (realistic inventories of a few dozen per ingredient, and large ones of 150–240 per ingredient, for all 15 targets), every case finished proven optimal, typically in 1–500 ms.
 
 ## Getting started
 
 The page loads ES modules, a Web Worker and the CSV files, so it has to be served over http. Opening `index.html` by double-clicking does not work.
 
 ```bash
-npm start          # http://127.0.0.1:5199, Node.js 18+, nothing to install
+node server.js     # http://127.0.0.1:5199, nothing to install
 ```
 
 Any static server does the same job, for example `python -m http.server`.
 
 ```bash
-npm test           # unit tests, Node's built-in test runner
+node --test        # unit tests, Node's built-in test runner
 ```
 
+`server.js` and the tests need Node.js 22.7 or newer (24 recommended). The page itself runs in any current browser, and there is no `package.json` and nothing to install.
+
 ### Deploying
-The project is plain static files, so it works from any path: GitHub Pages (serve the repository root), Netlify, Vercel or a plain folder. Nothing to build.
+The project is plain static files, so it works from any path: GitHub Pages, Netlify, Vercel or a plain folder. Nothing to build. On GitHub Pages, in the repository settings, serve from the `main` branch at the root.
+
+`index.html` holds an absolute `og:url`, used by Discord and the like to build a link preview. Fix it if the address ever changes. There is no `og:image` yet: add one there if you want a picture in the preview.
 
 ## Project structure
 
@@ -97,6 +113,8 @@ lib/                              # the domain and the engine, no DOM
   stateSearch.js                  # memoised state-space DP (reference engine)
 tests/optimizer.test.js           # unit tests
 tt2_alchemy_v8_2_*.csv            # the game data
+.github/                          # CI (runs the tests), issue and pull request templates
+CONTRIBUTING.md                   # how to help
 ```
 
 The shapes of the plain objects passed around (recipe, model, plan step, result) are described at the top of `lib/model.js`.
@@ -104,14 +122,26 @@ The shapes of the plain objects passed around (recipe, model, plan step, result)
 ## Tests
 
 `tests/optimizer.test.js` covers:
-direct recipe, intermediate chain, longer chain, two non-greedy scenarios, mixed strategies, `A + A` (A=1 impossible, A=2 possible), impossible targets (result 0), repeated recipes, the tie-break, safety limits, CSV parsing/validation, the real chain `Pepper + Berries → Sand → Spirit → 19 Crafting Shards`, executable plans for every reward, **agreement with the exhaustive state search on random inventories**, and large inventories solved exactly. Every plan in the tests is replayed craft by craft from the initial inventory.
+direct recipe, intermediate chain, longer chain, two non-greedy scenarios, mixed strategies, `A + A` (A=1 impossible, A=2 possible), impossible targets (result 0), repeated recipes, the tie-break, safety limits, CSV parsing/validation, the real chain `Pepper + Berries → Sand → Spirit → 19 Crafting Shards`, executable plans for every reward, **agreement with the exhaustive state search on random inventories**, weighted objectives (the weights decide who gets a shared ingredient, mixed plans, zero weights, invalid weights, agreement with the state search on random weights), and large inventories solved exactly. Every plan in the tests is replayed craft by craft from the initial inventory.
 
 ## Known limitations
 
-- The optimizer maximises **one** reward at a time; there is no weighted mix of rewards.
+- The values of a mix of rewards must be whole numbers, and there is no priority tier mode (get this first, then that with what is left, as on tt2.bagu.biz).
+- A mix with many rewards can take several seconds to prove optimal. It runs in the background and can be cancelled.
+- The page assumes you know every recipe. In the game a pair gives a mystery result until you have brewed it once.
 - The four equipment types (Common, Rare, Event, Legendary) are separate targets, as in the CSV.
 - Exactness is guaranteed when the result says *Proven optimal*. Pathological inventories could in theory hit the safety limits; the UI then says so explicitly and shows an upper bound.
 - Counts are capped at 99,999 per ingredient in the UI.
+
+## Contributing
+
+Bug reports, recipe updates and improvements are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). The short version: keep it plain files with no dependency, and run `node --test` before opening a pull request. The CI runs the same tests.
+
+## Credits
+
+The recipes come from the [community spreadsheet](https://docs.google.com/spreadsheets/d/1o95Ipwx6NIyFV3LCz9LGNbH9_WELHF-pbpkM31YwXyY/edit?gid=1745300311#gid=1745300311), set up by rawrzcookie and kept up to date by the community. Thanks to everyone who maintains it.
+
+Unofficial. Tap Titans 2 is a trademark of Game Hive Corp. This project is not affiliated with or endorsed by Game Hive.
 
 ## License
 
